@@ -1,0 +1,196 @@
+package com.watercrowdsourcing.report_service.controller;
+
+import java.util.List;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.watercrowdsourcing.image_service.dtos.ApiResponse;
+import com.watercrowdsourcing.image_service.dtos.AssignDepartmentRequest;
+import com.watercrowdsourcing.image_service.dtos.CreateReportRequest;
+import com.watercrowdsourcing.image_service.dtos.ReportResponse;
+import com.watercrowdsourcing.image_service.dtos.UpdateReportStatusRequest;
+import com.watercrowdsourcing.image_service.dtos.VerifyReportRequest;
+import com.watercrowdsourcing.image_service.entities.ReportStatus;
+import com.watercrowdsourcing.image_service.service.ReportService;
+
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+@RestController
+@RequestMapping("/reports")
+@RequiredArgsConstructor
+@Slf4j
+public class ReportController {
+
+    private final ReportService reportService;
+
+    // ================= USER =================
+
+    /**
+     * STEP 1: User creates report
+     * userId comes from API Gateway (JWT)
+     */
+    @PostMapping
+    public ResponseEntity<ReportResponse> createReport(
+            @RequestHeader("X-User-Id") Long userId,
+            @RequestBody @Valid CreateReportRequest request) {
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(reportService.createReport(userId, request));
+    }
+
+    /**
+     * User views own reports
+     */
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<List<ReportResponse>> getReportsByUser(
+            @PathVariable Long userId) {
+
+        return ResponseEntity.ok(reportService.getReportsByUser(userId));
+    }
+
+    /**
+     * Get single report (common)
+     */
+    @GetMapping("/{reportId}")
+    public ResponseEntity<ReportResponse> getReportById(
+            @PathVariable Long reportId) {
+
+        return ResponseEntity.ok(reportService.getReportById(reportId));
+    }
+
+    // ================= ADMIN =================
+
+    /**
+     * Admin verifies report
+     */
+    @PatchMapping("/{reportId}/verify")
+    public ResponseEntity<ApiResponse> verifyReport(
+            @PathVariable Long reportId,
+            @RequestBody @Valid VerifyReportRequest request) {
+
+        return ResponseEntity.ok(reportService.verifyReport(reportId, request));
+    }
+
+    /**
+     * Admin assigns department & issue
+     */
+    @PatchMapping("/{reportId}/assign")
+    public ResponseEntity<ApiResponse> assignDepartment(
+            @PathVariable Long reportId,
+            @RequestBody @Valid AssignDepartmentRequest request) {
+
+        return ResponseEntity.ok(
+                reportService.assignDepartment(reportId, request)
+        );
+    }
+
+    /**
+     * Admin filter by status
+     */
+    @GetMapping("/status/{status}")
+    public ResponseEntity<List<ReportResponse>> getReportsByStatus(
+            @PathVariable ReportStatus status) {
+
+        return ResponseEntity.ok(reportService.getReportsByStatus(status));
+    }
+
+    // ================= DEPARTMENT =================
+
+    /**
+     * Department updates report status
+     */
+    @PatchMapping("/{reportId}/status")
+    public ResponseEntity<ApiResponse> updateReportStatus(
+            @PathVariable Long reportId,
+            @RequestBody @Valid UpdateReportStatusRequest request) {
+
+        return ResponseEntity.ok(
+                reportService.updateReportStatus(reportId, request)
+        );
+    }
+}
+
+
+//@RestController
+//@RequestMapping("/reports")
+//@RequiredArgsConstructor
+//@Slf4j
+//public class ReportController {
+//
+//    private final ReportService reportService;
+//
+//    // ================= USER =================
+//
+//    @PostMapping
+//    public ResponseEntity<?> createReport(
+//            @RequestHeader("X-User-Id") Long userId,
+//            @RequestBody @Valid CreateReportRequest request) {
+//
+//        return ResponseEntity
+//                .status(HttpStatus.CREATED)
+//                .body(reportService.createReport(userId, request));
+//    }
+//
+//    @GetMapping("/user/{userId}")
+//    public ResponseEntity<?> getReportsByUser(@PathVariable Long userId) {
+//        return ResponseEntity.ok(reportService.getReportsByUser(userId));
+//    }
+//
+//    // ================= ADMIN =================
+//
+//    @GetMapping("/status/{status}")
+//    public ResponseEntity<?> getReportsByStatus(@PathVariable ReportStatus status) {
+//        return ResponseEntity.ok(reportService.getReportsByStatus(status));
+//    }
+//
+//    @PatchMapping("/{reportId}/verify")
+//    public ResponseEntity<?> verifyReport(@PathVariable Long reportId) {
+//        return ResponseEntity.ok(reportService.verifyReport(reportId));
+//    }
+//
+//    @PatchMapping("/{reportId}/assign")
+//    public ResponseEntity<?> assignDepartmentAndIssue(
+//            @PathVariable Long reportId,
+//            @RequestParam Long departmentId,
+//            @RequestParam Long issueId) {
+//
+//        return ResponseEntity.ok(
+//                reportService.assignDepartmentAndIssue(
+//                        reportId,
+//                        departmentId,
+//                        issueId
+//                )
+//        );
+//    }
+//
+//    // ================= DEPARTMENT =================
+//
+//    @GetMapping("/department/{departmentId}")
+//    public ResponseEntity<?> getReportsByDepartment(
+//            @PathVariable Long departmentId) {
+//
+//        return ResponseEntity.ok(
+//                reportService.getReportsByDepartment(departmentId));
+//    }
+//
+//    @PatchMapping("/{reportId}/status")
+//    public ResponseEntity<?> updateReportStatus(
+//            @PathVariable Long reportId,
+//            @RequestParam ReportStatus status) {
+//
+//        return ResponseEntity.ok(
+//                reportService.updateReportStatus(reportId, status));
+//    }
+//}

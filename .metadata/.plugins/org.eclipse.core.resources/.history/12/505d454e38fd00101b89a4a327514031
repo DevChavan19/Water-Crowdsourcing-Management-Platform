@@ -1,0 +1,174 @@
+package com.watercrowdsourcing.issue_service.service;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+import org.modelmapper.ModelMapper;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
+
+import com.watercrowdsourcing.issue_service.custom_exceptions.ResourceNotFoundException;
+import com.watercrowdsourcing.issue_service.dtos.ApiResponse;
+import com.watercrowdsourcing.issue_service.dtos.AssignDepartmentRequest;
+import com.watercrowdsourcing.issue_service.dtos.CreateIssueRequest;
+import com.watercrowdsourcing.issue_service.dtos.DepartmentResponse;
+import com.watercrowdsourcing.issue_service.dtos.IssueResponse;
+import com.watercrowdsourcing.issue_service.dtos.UpdateReportStatusRequest;
+import com.watercrowdsourcing.issue_service.entities.Issue;
+import com.watercrowdsourcing.issue_service.entities.IssueStatus;
+import com.watercrowdsourcing.issue_service.repository.IssueRepository;
+
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+@Service
+@Transactional
+@RequiredArgsConstructor
+@Slf4j
+public class IssueServiceImpl implements IssueService {
+
+    private final IssueRepository issueRepository;
+    private final ModelMapper modelMapper;
+    private final RestTemplate restTemplate;
+
+    // ================= ADMIN =================
+
+    @Override
+    public IssueResponse createIssue(CreateIssueRequest request, Long adminId, String jwtToken) {
+
+        // 0️ Validate Department
+        String departmentServiceUrl = "http://WATER-CROWD-DEPARTMENT-SERVICE/departments/" + request.getDepartmentId();
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(jwtToken); // forward token
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+        try {
+            ResponseEntity<DepartmentResponse> deptResponse = restTemplate.exchange(
+                    departmentServiceUrl,
+                    HttpMethod.GET,
+                    entity,
+                    DepartmentResponse.class);
+
+            DepartmentResponse dept = deptResponse.getBody();
+            if (dept == null || !dept.getIsActive()) {
+                throw new RuntimeException("Department not found or inactive");
+            }
+
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to validate department", e);
+        }
+
+        // 1️ Create Issue
+        Issue issue = new Issue();
+        issue.setReportId(request.getReportId());
+        issue.setDepartmentId(request.getDepartmentId());
+        issue.setAssignedByAdminId(adminId);
+        issue.setStatus(IssueStatus.OPEN);
+        issue.setCreatedAt(LocalDateTime.now());
+
+        Issue savedIssue = issueRepository.save(issue);
+
+        // 2️⃣ Update Report Service - assign department and issue
+        String assignDeptUrl = "http://WATER-CROWD-REPORT-SERVICE/reports/" + request.getReportId() + "/assign";
+        AssignDepartmentRequest deptRequest = new AssignDepartmentRequest();
+        deptRequest.setDepartmentId(request.getDepartmentId());
+        deptRequest.setIssueId(savedIssue.getIssueId());
+
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<AssignDepartmentRequest> deptEntity = new HttpEntity<>(deptRequest, headers);
+
+        try {
+            restTemplate.exchange(assignDeptUrl, HttpMethod.PUT, deptEntity, ApiResponse.class);
+            log.info("Report {} successfully assigned to department {} and linked to Issue {}",
+                    request.getReportId(), request.getDepartmentId(), savedIssue.getIssueId());
+        } catch (Exception e) {
+            log.error("Failed to assign department/issue to Report {}: {}", request.getReportId(), e.getMessage());
+            throw new RuntimeException("Failed to link report to department and issue", e);
+        }
+
+        // 3️ Return IssueResponse
+        return modelMapper.map(savedIssue, IssueResponse.class);
+    }
+
+    // ================= COMMON =================
+
+    @Override
+    public IssueResponse getIssueById(Long issueId) {
+
+        Issue issue = issueRepository.findById(issueId)
+                .orElseThrow(() -> new ResourceNotFoundException("Issue not found"));
+
+        return modelMapper.map(issue, IssueResponse.class);
+    }
+
+    // ================= DEPARTMENT =================
+
+    @Override
+    public List<IssueResponse> getIssuesByDepartment(Long departmentId) {
+
+        return issueRepository.findByDepartmentId(departmentId)
+                .stream()
+                .map(issue -> modelMapper.map(issue, IssueResponse.class))
+                .toList();
+    }
+
+    // ================= STATUS UPDATE =================
+
+    @Override
+    public IssueResponse updateIssueStatus(Long issueId, IssueStatus status, String jwtToken, Long resolutionImageId) {
+        Issue issue = issueRepository.findById(issueId)
+                .orElseThrow(() -> new ResourceNotFoundException("Issue not found"));
+
+        issue.setStatus(status);
+
+        if (status == IssueStatus.RESOLVED) {
+            issue.setResolvedAt(LocalDateTime.now());
+            if (resolutionImageId != null) {
+                issue.setResolutionImageId(resolutionImageId);
+            }
+            System.out.println(issue.getResolutionImageId());
+        }
+        issueRepository.save(issue);
+
+        // 🔁 Synchronize status with Report Service
+        // Map IssueStatus to ReportStatus
+        String reportStatusStr = status.name(); // Defaults to same name (OPEN, IN_PROGRESS, RESOLVED)
+
+        // Report Service uses ReportStatus enum (SUBMITTED, VERIFIED, ASSIGNED,
+        // IN_PROGRESS, RESOLVED, REJECTED)
+        // We only care about syncing IN_PROGRESS and RESOLVED from Department side.
+        if (status == IssueStatus.IN_PROGRESS || status == IssueStatus.RESOLVED) {
+            String reportUrl = "http://WATER-CROWD-REPORT-SERVICE/reports/"
+                    + issue.getReportId() + "/status";
+
+            UpdateReportStatusRequest updateRequest = new UpdateReportStatusRequest();
+            updateRequest.setStatus(reportStatusStr);
+            if (status == IssueStatus.RESOLVED && resolutionImageId != null) {
+                updateRequest.setResolutionImageId(resolutionImageId);
+            }
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setBearerAuth(jwtToken);
+            HttpEntity<UpdateReportStatusRequest> entity = new HttpEntity<>(updateRequest, headers);
+
+            try {
+                log.info("Updating Report status: {} for report: {}", reportStatusStr, issue.getReportId());
+                restTemplate.exchange(reportUrl, org.springframework.http.HttpMethod.PUT, entity, ApiResponse.class);
+            } catch (Exception e) {
+                log.error("Failed to synchronize report status: {}", e.getMessage());
+            }
+        }
+
+        return modelMapper.map(issue, IssueResponse.class);
+    }
+
+}

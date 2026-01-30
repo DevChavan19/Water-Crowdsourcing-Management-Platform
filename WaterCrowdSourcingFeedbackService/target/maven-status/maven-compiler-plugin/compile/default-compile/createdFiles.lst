@@ -1,0 +1,14 @@
+com\watercrowdsourcing\feedback_service\service\FeedbackServiceImpl.class
+com\watercrowdsourcing\feedback_service\WaterCrowdSourcingFeedbackServiceApplication.class
+com\watercrowdsourcing\feedback_service\dtos\ApiResponse.class
+com\watercrowdsourcing\feedback_service\repository\FeedbackRepository.class
+com\watercrowdsourcing\feedback_service\service\FeedbackService.class
+com\watercrowdsourcing\feedback_service\controller\FeedbackController.class
+com\watercrowdsourcing\feedback_service\exc_handler\GlobalExceptionHandler.class
+com\watercrowdsourcing\feedback_service\entities\Feedback.class
+com\watercrowdsourcing\feedback_service\dtos\FeedbackResponse.class
+com\watercrowdsourcing\feedback_service\security\JwtAuthenticationFilter.class
+com\watercrowdsourcing\feedback_service\security\SecurityConfiguration.class
+com\watercrowdsourcing\feedback_service\security\UserPrincipal.class
+com\watercrowdsourcing\feedback_service\dtos\CreateFeedbackRequest.class
+com\watercrowdsourcing\feedback_service\security\JwtUtils.class

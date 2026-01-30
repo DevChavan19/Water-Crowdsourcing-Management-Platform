@@ -1,0 +1,15 @@
+package com.watercrowdsourcing.report_service.dtos;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+public class VerifyReportRequest {
+
+    @NotNull
+    private Boolean verified;
+}
+

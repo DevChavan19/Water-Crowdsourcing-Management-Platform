@@ -1,0 +1,155 @@
+package com.watercrowdsourcing.issue_service.service;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+import org.modelmapper.ModelMapper;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
+
+import com.watercrowdsourcing.issue_service.custom_exceptions.ResourceNotFoundException;
+import com.watercrowdsourcing.issue_service.dtos.ApiResponse;
+import com.watercrowdsourcing.issue_service.dtos.AssignIssueRequest;
+import com.watercrowdsourcing.issue_service.dtos.CreateIssueRequest;
+import com.watercrowdsourcing.issue_service.dtos.DepartmentResponse;
+import com.watercrowdsourcing.issue_service.dtos.IssueResponse;
+import com.watercrowdsourcing.issue_service.entities.Issue;
+import com.watercrowdsourcing.issue_service.entities.IssueStatus;
+import com.watercrowdsourcing.issue_service.repository.IssueRepository;
+
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+@Service
+@Transactional
+@RequiredArgsConstructor
+@Slf4j
+public class IssueServiceImpl implements IssueService {
+
+    private final IssueRepository issueRepository;
+    private final ModelMapper modelMapper;
+    private final RestTemplate restTemplate;
+
+
+    // ================= ADMIN =================
+
+    @Override
+    public IssueResponse createIssue(CreateIssueRequest request, Long adminId, String jwtToken) {
+
+        // 0️⃣ Validate Department
+        String departmentServiceUrl = "http://WATER-CROWD-DEPARTMENT-SERVICE/departments/" + request.getDepartmentId();
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(jwtToken); // forward token
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+        try {
+            ResponseEntity<DepartmentResponse> deptResponse = restTemplate.exchange(
+                departmentServiceUrl,
+                HttpMethod.GET,
+                entity,
+                DepartmentResponse.class
+            );
+
+            DepartmentResponse dept = deptResponse.getBody();
+            if (dept == null || !dept.getIsActive()) {
+                throw new RuntimeException("Department not found or inactive");
+            }
+
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to validate department", e);
+        }
+
+        // 1️ Create Issue
+        Issue issue = new Issue();
+        issue.setReportId(request.getReportId());
+        issue.setDepartmentId(request.getDepartmentId());
+        issue.setAssignedByAdminId(adminId);
+        issue.setStatus(IssueStatus.OPEN);
+        issue.setCreatedAt(LocalDateTime.now());
+
+        Issue savedIssue = issueRepository.save(issue);
+
+        // 2️ Update Report Service
+        String reportServiceUrl = "http://WATER-CROWD-REPORT-SERVICE/reports/" 
+                + request.getReportId() + "/assign-issue";
+
+        AssignIssueRequest assignRequest = new AssignIssueRequest();
+        assignRequest.setIssueId(savedIssue.getIssueId());
+
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<AssignIssueRequest> reportEntity = new HttpEntity<>(assignRequest, headers);
+
+        try {
+            log.info("Updating Report {} with issueId {}", request.getReportId(), savedIssue.getIssueId());
+
+            ResponseEntity<ApiResponse> response = restTemplate.exchange(
+                reportServiceUrl,
+                HttpMethod.PUT,
+                reportEntity,
+                ApiResponse.class
+            );
+
+            log.info("Report update response: {}", response.getBody());
+
+        } catch (Exception e) {
+            log.error("Failed to update Report {}: {}", request.getReportId(), e.getMessage());
+            throw new RuntimeException("Failed to link report to issue", e);
+        }
+
+        // 3️ Return IssueResponse
+        return modelMapper.map(savedIssue, IssueResponse.class);
+    }
+
+
+    
+
+    // ================= COMMON =================
+
+    @Override
+    public IssueResponse getIssueById(Long issueId) {
+
+        Issue issue = issueRepository.findById(issueId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Issue not found"));
+
+        return modelMapper.map(issue, IssueResponse.class);
+    }
+
+    // ================= DEPARTMENT =================
+
+    @Override
+    public List<IssueResponse> getIssuesByDepartment(Long departmentId) {
+
+        return issueRepository.findByDepartmentId(departmentId)
+                .stream()
+                .map(issue -> modelMapper.map(issue, IssueResponse.class))
+                .toList();
+    }
+
+    // ================= STATUS UPDATE =================
+
+    @Override
+    public IssueResponse updateIssueStatus(Long issueId, IssueStatus status) {
+
+        Issue issue = issueRepository.findById(issueId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Issue not found"));
+
+        issue.setStatus(status);
+
+        if (status == IssueStatus.RESOLVED) {
+            issue.setResolvedAt(LocalDateTime.now());
+        }
+        issueRepository.save(issue);
+
+        return modelMapper.map(issue, IssueResponse.class);
+    }
+}

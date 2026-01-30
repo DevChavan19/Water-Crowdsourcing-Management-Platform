@@ -1,0 +1,5 @@
+package com.watercrowdsourcing.report_service.dtos;
+
+public class ReportResponse {
+
+}

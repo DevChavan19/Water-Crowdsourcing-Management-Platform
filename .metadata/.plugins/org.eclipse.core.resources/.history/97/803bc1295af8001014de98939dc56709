@@ -1,0 +1,158 @@
+package com.watercrowdsourcing.report_service.service;
+
+import java.util.List;
+
+import org.modelmapper.ModelMapper;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.watercrowdsourcing.report_service.custom_exceptions.InvalidInputException;
+import com.watercrowdsourcing.report_service.custom_exceptions.ResourceNotFoundException;
+import com.watercrowdsourcing.report_service.dtos.AdminSignupRequest;
+import com.watercrowdsourcing.report_service.dtos.ApiResponse;
+import com.watercrowdsourcing.report_service.dtos.AuthRequest;
+import com.watercrowdsourcing.report_service.dtos.AuthResp;
+import com.watercrowdsourcing.report_service.dtos.UserDTO;
+import com.watercrowdsourcing.report_service.dtos.UserSignupRequest;
+import com.watercrowdsourcing.report_service.entities.Role;
+import com.watercrowdsourcing.report_service.entities.User;
+import com.watercrowdsourcing.report_service.repository.UserRepository;
+import com.watercrowdsourcing.report_service.security.JwtUtils;
+import com.watercrowdsourcing.report_service.security.UserPrincipal;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+@Service 
+@Transactional 
+@RequiredArgsConstructor
+@Slf4j
+public class UserServiceImpl implements UserService {
+
+	private final UserRepository userRepository;
+	private final ModelMapper modelMapper;
+	private final PasswordEncoder passwordEncoder;
+	private final AuthenticationManager authenticationManager;
+	private final JwtUtils jwtUtils;
+
+	@Override
+	public List<UserDTO> getAllUsers() {
+
+		return userRepository.findAll() 
+				.stream() 
+				.map(entity -> modelMapper.map(entity, UserDTO.class))
+				.toList();
+	}
+
+	@Override
+	public String addUser(User user) {
+
+		if (userRepository.existsByEmailOrPhone(user.getEmail(), user.getPhone())) {
+
+			throw new InvalidInputException("Dup email or phone !!!!!!!!");
+		}
+		user.setPassword(passwordEncoder.encode(user.getPassword()));
+		// 3. Save user
+		User persistentUser = userRepository.save(user);
+
+		return "New User added with ID=" + persistentUser.getUserId();
+	}
+
+	@Override
+	public ApiResponse deleteUserDetails(Long userId) {
+
+		if (userRepository.existsById(userId)) {
+
+			userRepository.deleteById(userId);
+			return new ApiResponse("Success", "User details deleted ....");
+		}
+
+		throw new ResourceNotFoundException("User doesn't exist by id !!!!!");
+	}
+
+	@Override
+	public User getUserDetails(Long userId) {
+
+		return userRepository.findById(userId) 
+				.orElseThrow(() -> new ResourceNotFoundException("Invalid user id !!!!!"));
+	}
+
+	@Override
+	public ApiResponse updateDetails(Long id, User user) {
+
+		User persistentUser = getUserDetails(id);
+		persistentUser.setFirstName(user.getFirstName());
+		persistentUser.setLastName(user.getLastName());
+		persistentUser.setPassword(user.getPassword());
+
+		return new ApiResponse("Success", "Updated user details");
+	}
+
+	@Override
+	public AuthResp authenticate(AuthRequest request) {
+		System.out.println("in user sign in " + request);
+
+		Authentication holder = new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword());
+		log.info("*****Before -  is authenticated {}", holder.isAuthenticated());// false
+	
+		Authentication fullyAuth = authenticationManager.authenticate(holder);
+		
+		log.info("*****After -  is authenticated {}", fullyAuth.isAuthenticated());// true
+		log.info("**** auth {} ", fullyAuth);// principal : user details , null : pwd , Collection<GrantedAuth>
+		log.info("***** class of principal {}", fullyAuth.getPrincipal().getClass());// com.healthcare.security.UserPrincipal
+	
+		UserPrincipal principal = (UserPrincipal) fullyAuth.getPrincipal();
+		return new AuthResp(jwtUtils.generateToken(principal), "Successful Login");
+
+	}
+
+	@Override
+	public ApiResponse encryptPasswords() {
+		
+		List<User> users = userRepository.findAll();
+		
+		users.forEach(user -> user.setPassword(passwordEncoder.encode(user.getPassword())));
+		return new ApiResponse("Password encrypted", "Success");
+	}
+
+	@Override
+	public ApiResponse userSignup(UserSignupRequest request) {
+
+	    if (userRepository.existsByEmailOrPhone(request.getEmail(), request.getPhone())) {
+	        throw new InvalidInputException("Email or phone already exists");
+	    }
+
+	    User user = modelMapper.map(request, User.class);
+	    user.setPassword(passwordEncoder.encode(request.getPassword()));
+	    user.setRole(Role.USER);
+	    user.setDeleted(false);
+
+	    userRepository.save(user);
+	    return new ApiResponse("SUCCESS", "User registered successfully");
+	}
+
+	@Override
+	public ApiResponse adminSignup(AdminSignupRequest request) {
+		if (userRepository.existsByEmail(request.getEmail())) {
+	        throw new InvalidInputException("Admin email already exists");
+	    }
+
+	    User admin = new User();
+	    admin.setFirstName(request.getFirstName());
+	    admin.setLastName(request.getLastName());
+	    admin.setEmail(request.getEmail());
+	    admin.setPhone(request.getPhone());
+	    admin.setPassword(passwordEncoder.encode(request.getPassword()));
+	    admin.setRole(Role.ADMIN);
+	    admin.setVerified(true);
+	    admin.setDeleted(false);
+
+	    userRepository.save(admin);
+	    return new ApiResponse("SUCCESS", "Admin registered successfully");
+	}
+
+}

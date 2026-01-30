@@ -1,0 +1,10 @@
+ package com.watercrowdsourcing.report_service.entities;
+
+public enum ReportStatus {
+	PENDING_VERIFICATION,
+    VERIFIED,
+    ASSIGNED,
+    IN_PROGRESS,
+    RESOLVED,
+    REJECTED, SUBMITTED
+}

@@ -1,0 +1,5 @@
+package com.watercrowdsourcing.report_service.entities;
+
+public enum Role {
+USER , ADMIN
+}

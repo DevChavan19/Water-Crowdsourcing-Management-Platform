@@ -1,0 +1,391 @@
+package com.watercrowdsourcing.report_service.service;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+import org.modelmapper.ModelMapper;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.access.prepost.PreAuthorize;
+
+import com.watercrowdsourcing.report_service.custom_exceptions.ResourceNotFoundException;
+import com.watercrowdsourcing.report_service.dtos.ApiResponse;
+import com.watercrowdsourcing.report_service.dtos.AssignDepartmentRequest;
+import com.watercrowdsourcing.report_service.dtos.CreateReportRequest;
+import com.watercrowdsourcing.report_service.dtos.ReportResponse;
+import com.watercrowdsourcing.report_service.dtos.UpdateReportStatusRequest;
+import com.watercrowdsourcing.report_service.dtos.VerifyReportRequest;
+import com.watercrowdsourcing.report_service.entities.Report;
+import com.watercrowdsourcing.report_service.entities.ReportStatus;
+import com.watercrowdsourcing.report_service.repository.ReportRepository;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+@Service
+@Transactional
+@RequiredArgsConstructor
+@Slf4j
+public class ReportServiceImpl implements ReportService {
+
+    private final ReportRepository reportRepository;
+    private final ModelMapper modelMapper;
+
+    // ================= USER =================
+
+    @Override
+    public ReportResponse createReport(Long userId, CreateReportRequest request) {
+        Report report = new Report();
+        report.setUserId(userId);
+        report.setDescription(request.getDescription());
+        report.setLatitude(request.getLatitude());
+        report.setLongitude(request.getLongitude());
+        report.setImageIds(request.getImageIds());
+
+        report.setStatus(ReportStatus.SUBMITTED);
+        report.setCreatedAt(LocalDateTime.now());
+
+        Report saved = reportRepository.save(report);
+        return modelMapper.map(saved, ReportResponse.class);
+    }
+
+    @Override
+    public List<ReportResponse> getReportsByUser(Long userId) {
+        return reportRepository.findByUserId(userId)
+                .stream()
+                .map(r -> modelMapper.map(r, ReportResponse.class))
+                .toList();
+    }
+
+    @Override
+    public ReportResponse getReportById(Long reportId) {
+        Report report = getReportEntity(reportId);
+        return modelMapper.map(report, ReportResponse.class);
+    }
+
+    // ================= ADMIN =================
+
+    @Override
+    @PreAuthorize("hasRole('ADMIN')")
+    public List<ReportResponse> getReportsByStatus(ReportStatus status) {
+        return reportRepository.findByStatus(status)
+                .stream()
+                .map(r -> modelMapper.map(r, ReportResponse.class))
+                .toList();
+    }
+
+    @Override
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse verifyReport(Long reportId, VerifyReportRequest request) {
+        Report report = getReportEntity(reportId);
+
+        if (report.getStatus() != ReportStatus.SUBMITTED) {
+            throw new IllegalStateException("Only SUBMITTED reports can be verified");
+        }
+
+        report.setStatus(ReportStatus.VERIFIED);
+        report.setVerifiedAt(LocalDateTime.now());
+        reportRepository.save(report);
+
+        return new ApiResponse("SUCCESS", "Report verified");
+    }
+
+    @Override
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse assignDepartment(Long reportId, AssignDepartmentRequest request) {
+        Report report = getReportEntity(reportId);
+
+        if (report.getStatus() != ReportStatus.VERIFIED) {
+            throw new IllegalStateException("Verify report before assigning");
+        }
+
+        report.setDepartmentId(request.getDepartmentId());
+        report.setIssueId(request.getIssueId());
+        report.setStatus(ReportStatus.ASSIGNED);
+        reportRepository.save(report);
+
+        return new ApiResponse("SUCCESS", "Department assigned");
+    }
+
+    // ================= DEPARTMENT =================
+
+    @Override
+    @PreAuthorize("hasRole('DEPARTMENT')")
+    public ApiResponse updateReportStatus(Long reportId, UpdateReportStatusRequest request) {
+        Report report = getReportEntity(reportId);
+
+        report.setStatus(request.getStatus());
+
+        if (request.getStatus() == ReportStatus.RESOLVED) {
+            report.setClosedAt(LocalDateTime.now());
+        }
+
+        reportRepository.save(report);
+        return new ApiResponse("SUCCESS", "Report status updated");
+    }
+
+    // ================= INTERNAL =================
+
+    private Report getReportEntity(Long reportId) {
+        return reportRepository.findById(reportId)
+                .orElseThrow(() -> new ResourceNotFoundException("Report not found"));
+    }
+
+    // ================= ISSUE LINKING =================
+
+    @Override
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse assignIssue(Long reportId, Long issueId) {
+        Report report = getReportEntity(reportId);
+
+        if (report.getStatus() != ReportStatus.VERIFIED
+                && report.getStatus() != ReportStatus.ASSIGNED) {
+            throw new IllegalStateException("Issue can be assigned only after verification or assignment");
+        }
+
+        report.setIssueId(issueId);
+        report.setStatus(ReportStatus.IN_PROGRESS);
+        reportRepository.save(report);
+
+        return new ApiResponse("SUCCESS", "Issue linked to report");
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//package com.watercrowdsourcing.report_service.service;
+//
+//import java.time.LocalDateTime;
+//import java.util.List;
+//
+//import org.modelmapper.ModelMapper;
+//import org.springframework.stereotype.Service;
+//import org.springframework.transaction.annotation.Transactional;
+//
+//import com.watercrowdsourcing.report_service.custom_exceptions.ResourceNotFoundException;
+//import com.watercrowdsourcing.report_service.dtos.ApiResponse;
+//import com.watercrowdsourcing.report_service.dtos.AssignDepartmentRequest;
+//import com.watercrowdsourcing.report_service.dtos.CreateReportRequest;
+//import com.watercrowdsourcing.report_service.dtos.ReportResponse;
+//import com.watercrowdsourcing.report_service.dtos.UpdateReportStatusRequest;
+//import com.watercrowdsourcing.report_service.dtos.VerifyReportRequest;
+//import com.watercrowdsourcing.report_service.entities.Report;
+//import com.watercrowdsourcing.report_service.entities.ReportStatus;
+//import com.watercrowdsourcing.report_service.repository.ReportRepository;
+//
+//import lombok.RequiredArgsConstructor;
+//import lombok.extern.slf4j.Slf4j;
+//
+//@Service
+//@Transactional
+//@RequiredArgsConstructor
+//@Slf4j
+//public class ReportServiceImpl implements ReportService {
+//
+//    private final ReportRepository reportRepository;
+//    private final ModelMapper modelMapper;
+//
+//    // ================= USER =================
+//
+//    @Override
+//    public ReportResponse createReport(Long userId, CreateReportRequest request) {
+//
+//        Report report = new Report();
+//        report.setUserId(userId);
+//        report.setDescription(request.getDescription());
+//        report.setLatitude(request.getLatitude());
+//        report.setLongitude(request.getLongitude());
+//        report.setImageIds(request.getImageIds());
+//
+//        report.setStatus(ReportStatus.SUBMITTED);
+//        report.setCreatedAt(LocalDateTime.now());
+//
+//        Report saved = reportRepository.save(report);
+//        return modelMapper.map(saved, ReportResponse.class);
+//    }
+//
+//
+//    @Override
+//    public List<ReportResponse> getReportsByUser(Long userId) {
+//        return reportRepository.findByUserId(userId)
+//                .stream()
+//                .map(r -> modelMapper.map(r, ReportResponse.class))
+//                .toList();
+//    }
+//
+//    @Override
+//    public ReportResponse getReportById(Long reportId) {
+//        Report report = reportRepository.findById(reportId)
+//                .orElseThrow(() ->
+//                        new ResourceNotFoundException("Report not found"));
+//
+//        return modelMapper.map(report, ReportResponse.class);
+//    }
+//
+//    // ================= ADMIN =================
+//
+//    @Override
+//    public List<ReportResponse> getReportsByStatus(ReportStatus status) {
+//        return reportRepository.findByStatus(status)
+//                .stream()
+//                .map(r -> modelMapper.map(r, ReportResponse.class))
+//                .toList();
+//    }
+//
+//    @Override
+//    public ApiResponse verifyReport(Long reportId, VerifyReportRequest request) {
+//
+//        Report report = getReportEntity(reportId);
+//
+//        if (report.getStatus() != ReportStatus.SUBMITTED) {
+//            throw new IllegalStateException("Only SUBMITTED reports can be verified");
+//        }
+//
+//        report.setStatus(ReportStatus.VERIFIED);
+//        reportRepository.save(report);
+//        return new ApiResponse("SUCCESS", "Report verified");
+//    }
+//
+//    @Override
+//    public ApiResponse assignDepartment(Long reportId, AssignDepartmentRequest request) {
+//
+//        Report report = getReportEntity(reportId);
+//
+//        if (report.getStatus() != ReportStatus.VERIFIED) {
+//            throw new IllegalStateException("Verify report before assigning");
+//        }
+//
+//        report.setDepartmentId(request.getDepartmentId());
+//        report.setIssueId(request.getIssueId());
+//        report.setStatus(ReportStatus.ASSIGNED);
+//
+//        return new ApiResponse("SUCCESS", "Department assigned");
+//    }
+//
+//    // ================= DEPARTMENT =================
+//
+//    @Override
+//    public ApiResponse updateReportStatus(Long reportId, UpdateReportStatusRequest request) {
+//
+//        Report report = getReportEntity(reportId);
+//
+//        report.setStatus(request.getStatus());
+//        return new ApiResponse("SUCCESS", "Report status updated");
+//    }
+//
+//    // ================= INTERNAL =================
+//
+//    private Report getReportEntity(Long reportId) {
+//        return reportRepository.findById(reportId)
+//                .orElseThrow(() ->
+//                        new ResourceNotFoundException("Report not found"));
+//    }
+//
+//   //======================= connecting to issue =======================
+//    @Override
+//    public ApiResponse assignIssue(Long reportId, Long issueId) {
+//
+//        Report report = reportRepository.findById(reportId)
+//                .orElseThrow(() ->
+//                        new ResourceNotFoundException("Report not found"));
+//
+//        // business rule
+//        if (report.getStatus() != ReportStatus.VERIFIED
+//                && report.getStatus() != ReportStatus.ASSIGNED) {
+//            throw new IllegalStateException(
+//                    "Issue can be assigned only after verification");
+//        }
+//
+//        report.setIssueId(issueId);
+//        report.setStatus(ReportStatus.IN_PROGRESS);
+//        reportRepository.save(report);
+//
+//        return new ApiResponse("SUCCESS", "Issue linked to report");
+//    }
+//
+//}
+
+
+//@Service
+//@Transactional
+//@RequiredArgsConstructor
+//public class ReportServiceImpl implements ReportService {
+//
+//    private final ReportRepository reportRepository;
+//
+//    // USER
+//    @Override
+//    public Report createReport(Long userId, CreateReportRequest request) {
+//        Report report = new Report();
+//        report.setTitle(request.getTitle());
+//        report.setDescription(request.getDescription());
+//        report.setLatitude(request.getLatitude());
+//        report.setLongitude(request.getLongitude());
+//        report.setUserId(userId);
+//        report.setStatus(ReportStatus.PENDING_VERIFICATION);
+//
+//        return reportRepository.save(report);
+//    }
+//
+//    @Override
+//    public List<Report> getReportsByUser(Long userId) {
+//        return reportRepository.findByUserId(userId);
+//    }
+//
+//    // ADMIN
+//    @Override
+//    public List<Report> getReportsByStatus(ReportStatus status) {
+//        return reportRepository.findByStatus(status);
+//    }
+//
+//    @Override
+//    public ApiResponse verifyReport(Long reportId) {
+//        Report report = reportRepository.findById(reportId)
+//                .orElseThrow(() -> new ResourceNotFoundException("Report not found"));
+//
+//        report.setStatus(ReportStatus.VERIFIED);
+//        return new ApiResponse("SUCCESS", "Report verified");
+//    }
+//
+//    @Override
+//    public ApiResponse assignDepartmentAndIssue(
+//            Long reportId,
+//            Long departmentId,
+//            Long issueId) {
+//
+//        Report report = reportRepository.findById(reportId)
+//                .orElseThrow(() -> new ResourceNotFoundException("Report not found"));
+//
+//        report.setDepartmentId(departmentId);
+//        report.setIssueId(issueId);
+//        report.setStatus(ReportStatus.ASSIGNED);
+//
+//        return new ApiResponse("SUCCESS", "Report assigned to department");
+//    }
+//
+//    // DEPARTMENT
+//    @Override
+//    public List<Report> getReportsByDepartment(Long departmentId) {
+//        return reportRepository.findByDepartmentId(departmentId);
+//    }
+//
+//    @Override
+//    public ApiResponse updateReportStatus(Long reportId, ReportStatus status) {
+//        Report report = reportRepository.findById(reportId)
+//                .orElseThrow(() -> new ResourceNotFoundException("Report not found"));
+//
+//        report.setStatus(status);
+//        return new ApiResponse("SUCCESS", "Report status updated");
+//    }
+//}

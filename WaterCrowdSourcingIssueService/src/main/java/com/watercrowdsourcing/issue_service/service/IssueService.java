@@ -1,0 +1,22 @@
+package com.watercrowdsourcing.issue_service.service;
+
+import java.util.List;
+
+import com.watercrowdsourcing.issue_service.dtos.CreateIssueRequest;
+import com.watercrowdsourcing.issue_service.dtos.IssueResponse;
+import com.watercrowdsourcing.issue_service.entities.IssueStatus;
+
+public interface IssueService {
+
+    // Admin creates issue from report
+    IssueResponse createIssue(CreateIssueRequest request, Long adminId, String jwtToken);
+
+    // Get single issue
+    IssueResponse getIssueById(Long issueId);
+
+    // Department views its issues
+    List<IssueResponse> getIssuesByDepartment(Long departmentId);
+
+    // Admin / Department updates issue status
+    IssueResponse updateIssueStatus(Long issueId, IssueStatus status, String jwtToken, Long resolutionImageId);
+}

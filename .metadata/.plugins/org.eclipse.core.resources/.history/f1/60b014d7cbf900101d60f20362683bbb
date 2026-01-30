@@ -1,0 +1,85 @@
+package com.watercrowdsourcing.issue_service.service;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+import org.modelmapper.ModelMapper;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.watercrowdsourcing.issue_service.custom_exceptions.ResourceNotFoundException;
+import com.watercrowdsourcing.issue_service.dtos.CreateIssueRequest;
+import com.watercrowdsourcing.issue_service.dtos.IssueResponse;
+import com.watercrowdsourcing.issue_service.entities.Issue;
+import com.watercrowdsourcing.issue_service.entities.IssueStatus;
+import com.watercrowdsourcing.issue_service.repository.IssueRepository;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+@Service
+@Transactional
+@RequiredArgsConstructor
+@Slf4j
+public class IssueServiceImpl implements IssueService {
+
+    private final IssueRepository issueRepository;
+    private final ModelMapper modelMapper;
+
+    // ================= ADMIN =================
+
+    @Override
+    public IssueResponse createIssue(CreateIssueRequest request, Long adminId) {
+
+        Issue issue = new Issue();
+        issue.setReportId(request.getReportId());
+        issue.setDepartmentId(request.getDepartmentId());
+        issue.setAssignedByAdminId(adminId);
+        issue.setStatus(IssueStatus.OPEN);
+        issue.setCreatedAt(LocalDateTime.now());
+
+        Issue saved = issueRepository.save(issue);
+        return modelMapper.map(saved, IssueResponse.class);
+    }
+
+    // ================= COMMON =================
+
+    @Override
+    public IssueResponse getIssueById(Long issueId) {
+
+        Issue issue = issueRepository.findById(issueId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Issue not found"));
+
+        return modelMapper.map(issue, IssueResponse.class);
+    }
+
+    // ================= DEPARTMENT =================
+
+    @Override
+    public List<IssueResponse> getIssuesByDepartment(Long departmentId) {
+
+        return issueRepository.findByDepartmentId(departmentId)
+                .stream()
+                .map(issue -> modelMapper.map(issue, IssueResponse.class))
+                .toList();
+    }
+
+    // ================= STATUS UPDATE =================
+
+    @Override
+    public IssueResponse updateIssueStatus(Long issueId, IssueStatus status) {
+
+        Issue issue = issueRepository.findById(issueId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Issue not found"));
+
+        issue.setStatus(status);
+
+        if (status == IssueStatus.RESOLVED) {
+            issue.setResolvedAt(LocalDateTime.now());
+        }
+
+        return modelMapper.map(issue, IssueResponse.class);
+    }
+}

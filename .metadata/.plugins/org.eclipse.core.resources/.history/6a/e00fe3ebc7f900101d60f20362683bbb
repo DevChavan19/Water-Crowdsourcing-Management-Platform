@@ -1,0 +1,27 @@
+package com.watercrowdsourcing.issue_service.dtos;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+import com.watercrowdsourcing.issue_service.entities.IssueStatus;
+import com.watercrowdsourcing.issue_service.entities.ReportStatus;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Getter
+@Setter
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+public class IssueResponse {
+    private Long issueId;
+    private Long reportId;
+    private Long departmentId;
+    private IssueStatus status;
+    private LocalDateTime createdAt;
+}
+

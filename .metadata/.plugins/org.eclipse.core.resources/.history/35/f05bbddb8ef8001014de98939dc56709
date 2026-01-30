@@ -1,0 +1,23 @@
+package com.watercrowdsourcing.report_service.repository;
+
+import java.util.List;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import com.watercrowdsourcing.report_service.entities.Report;
+import com.watercrowdsourcing.report_service.entities.ReportStatus;
+
+public interface ReportRepository extends JpaRepository<Report, Long> {
+
+    // USER: view own reports
+    List<Report> findByUserId(Long userId);
+
+    // ADMIN: pending verification
+    List<Report> findByStatus(ReportStatus status);
+
+    // ADMIN: reports for a department
+    List<Report> findByDepartmentId(Long departmentId);
+
+    // DEPARTMENT: filter by dept + status
+    List<Report> findByDepartmentIdAndStatus(Long departmentId, ReportStatus status);
+}

@@ -1,0 +1,22 @@
+# IDE files
+.metadata/
+.classpath
+.project
+.settings/
+*.class
+
+# Build outputs
+target/
+bin/
+*.jar
+*.war
+*.ear
+
+# Logs and temp
+*.log
+temp/
+tmp/
+
+# OS files
+Thumbs.db
+.DS_Store

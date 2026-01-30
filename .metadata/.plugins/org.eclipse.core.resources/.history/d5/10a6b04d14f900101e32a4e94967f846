@@ -1,0 +1,30 @@
+package com.watercrowdsourcing.report_service.dtos;
+
+
+import java.util.List;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+@AllArgsConstructor
+public class CreateReportRequest {
+
+    @NotBlank
+    @Size(max = 1000)
+    private String description;
+
+    @NotNull
+    private Double latitude;
+
+    @NotNull
+    private Double longitude;
+    
+    // for image
+    private List<Long> imageIds;
+}

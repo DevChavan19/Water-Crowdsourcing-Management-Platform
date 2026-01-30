@@ -1,0 +1,88 @@
+package com.watercrowdsourcing.report_service.service;
+
+import java.util.List;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.watercrowdsourcing.report_service.custom_exceptions.ResourceNotFoundException;
+import com.watercrowdsourcing.report_service.dtos.ApiResponse;
+import com.watercrowdsourcing.report_service.dtos.ReportRequest;
+import com.watercrowdsourcing.report_service.entities.Report;
+import com.watercrowdsourcing.report_service.entities.ReportStatus;
+import com.watercrowdsourcing.report_service.repository.ReportRepository;
+
+import lombok.RequiredArgsConstructor;
+
+@Service
+@Transactional
+@RequiredArgsConstructor
+public class ReportServiceImpl implements ReportService {
+
+    private final ReportRepository reportRepository;
+
+    // USER
+    @Override
+    public Report createReport(Long userId, ReportRequest request) {
+        Report report = new Report();
+        report.setTitle(request.getTitle());
+        report.setDescription(request.getDescription());
+        report.setLatitude(request.getLatitude());
+        report.setLongitude(request.getLongitude());
+        report.setUserId(userId);
+        report.setStatus(ReportStatus.PENDING_VERIFICATION);
+
+        return reportRepository.save(report);
+    }
+
+    @Override
+    public List<Report> getReportsByUser(Long userId) {
+        return reportRepository.findByUserId(userId);
+    }
+
+    // ADMIN
+    @Override
+    public List<Report> getReportsByStatus(ReportStatus status) {
+        return reportRepository.findByStatus(status);
+    }
+
+    @Override
+    public ApiResponse verifyReport(Long reportId) {
+        Report report = reportRepository.findById(reportId)
+                .orElseThrow(() -> new ResourceNotFoundException("Report not found"));
+
+        report.setStatus(ReportStatus.VERIFIED);
+        return new ApiResponse("SUCCESS", "Report verified");
+    }
+
+    @Override
+    public ApiResponse assignDepartmentAndIssue(
+            Long reportId,
+            Long departmentId,
+            Long issueId) {
+
+        Report report = reportRepository.findById(reportId)
+                .orElseThrow(() -> new ResourceNotFoundException("Report not found"));
+
+        report.setDepartmentId(departmentId);
+        report.setIssueId(issueId);
+        report.setStatus(ReportStatus.ASSIGNED);
+
+        return new ApiResponse("SUCCESS", "Report assigned to department");
+    }
+
+    // DEPARTMENT
+    @Override
+    public List<Report> getReportsByDepartment(Long departmentId) {
+        return reportRepository.findByDepartmentId(departmentId);
+    }
+
+    @Override
+    public ApiResponse updateReportStatus(Long reportId, ReportStatus status) {
+        Report report = reportRepository.findById(reportId)
+                .orElseThrow(() -> new ResourceNotFoundException("Report not found"));
+
+        report.setStatus(status);
+        return new ApiResponse("SUCCESS", "Report status updated");
+    }
+}

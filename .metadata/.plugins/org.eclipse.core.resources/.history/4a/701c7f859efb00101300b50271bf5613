@@ -1,0 +1,38 @@
+package com.watercrowdsourcing.report_service.service;
+
+
+import java.util.List;
+
+import com.watercrowdsourcing.report_service.dtos.ApiResponse;
+import com.watercrowdsourcing.report_service.dtos.AssignDepartmentRequest;
+import com.watercrowdsourcing.report_service.dtos.CreateReportRequest;
+import com.watercrowdsourcing.report_service.dtos.ReportResponse;
+import com.watercrowdsourcing.report_service.dtos.UpdateReportStatusRequest;
+import com.watercrowdsourcing.report_service.dtos.VerifyReportRequest;
+import com.watercrowdsourcing.report_service.entities.ReportStatus;
+
+public interface ReportService {
+
+    // STEP 1: USER
+    ReportResponse createReport(Long userId, CreateReportRequest request);
+    List<ReportResponse> getReportsByUser(Long userId);
+
+    // COMMON
+    ReportResponse getReportById(Long reportId);
+
+    // STEP 2: ADMIN
+    ApiResponse verifyReport(Long reportId, VerifyReportRequest request);
+    ApiResponse assignDepartment(Long reportId, AssignDepartmentRequest request);
+    List<ReportResponse> getReportsByStatus(ReportStatus status);
+
+    // STEP 3: DEPARTMENT
+    ApiResponse updateReportStatus(
+            Long reportId,
+            UpdateReportStatusRequest request
+    );
+    
+    //
+    ApiResponse assignIssue(Long reportId, Long issueId);
+
+}
+

@@ -1,0 +1,43 @@
+package com.watercrowdsourcing.image_service.controller;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.watercrowdsourcing.image_service.entities.Image;
+import com.watercrowdsourcing.image_service.service.ImageService;
+
+import lombok.RequiredArgsConstructor;
+
+@RestController
+@RequestMapping("/images")
+@RequiredArgsConstructor
+public class ImageController {
+
+    private final ImageService imageService;
+
+    /**
+     * Upload an image and get imageId
+     */
+    @PostMapping
+    public ResponseEntity<Long> uploadImage(@RequestParam("file") MultipartFile file) {
+
+        Long imageId = imageService.uploadImage(file);
+        return ResponseEntity.status(HttpStatus.CREATED).body(imageId);
+    }
+
+    /**
+     * Fetch an image by imageId
+     */
+    @GetMapping("/{imageId}")
+    public ResponseEntity<byte[]> getImage(@PathVariable Long imageId) {
+
+        Image image = imageService.getImage(imageId);
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.valueOf(image.getContentType()))
+                .body(image.getData());
+    }
+}

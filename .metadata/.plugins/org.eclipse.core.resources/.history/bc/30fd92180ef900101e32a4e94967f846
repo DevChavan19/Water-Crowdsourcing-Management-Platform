@@ -1,0 +1,24 @@
+package com.watercrowdsourcing.image_service.repository;
+
+
+import java.util.List;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import com.watercrowdsourcing.image_service.entities.Image;
+import com.watercrowdsourcing.image_service.entities.ReportStatus;
+
+public interface ReportRepository extends JpaRepository<Image, Long> {
+
+    // USER
+    List<Image> findByUserId(Long userId);
+
+    // ADMIN
+    List<Image> findByStatus(ReportStatus status);
+
+    // DEPARTMENT
+    List<Image> findByDepartmentId(Long departmentId);
+
+    // SAFETY CHECKS
+    boolean existsByReportIdAndUserId(Long reportId, Long userId);
+}

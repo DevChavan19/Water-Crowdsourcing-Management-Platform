@@ -1,0 +1,71 @@
+package com.watercrowdsourcing.issue_service.controller;
+
+import java.util.List;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import com.watercrowdsourcing.issue_service.dtos.CreateIssueRequest;
+import com.watercrowdsourcing.issue_service.dtos.IssueResponse;
+import com.watercrowdsourcing.issue_service.entities.IssueStatus;
+import com.watercrowdsourcing.issue_service.service.IssueService;
+
+import lombok.RequiredArgsConstructor;
+
+@RestController
+@RequestMapping("/issues")
+@RequiredArgsConstructor
+public class IssueController {
+
+    private final IssueService issueService;
+
+    // ================= ADMIN =================
+    // Create Issue (Assigned by Admin)
+    @PostMapping
+    public ResponseEntity<IssueResponse> createIssue(
+            @RequestBody CreateIssueRequest request
+    ) {
+        // TEMP: hardcoded adminId (replace with JWT later)
+        Long adminId = 1L;
+
+        IssueResponse response = issueService.createIssue(request, adminId);
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(response);
+    }
+
+    // ================= COMMON =================
+    // Get Issue by Issue ID
+    @GetMapping("/{issueId}")
+    public ResponseEntity<IssueResponse> getIssueById(
+            @PathVariable Long issueId
+    ) {
+        return ResponseEntity.ok(
+                issueService.getIssueById(issueId)
+        );
+    }
+
+    // ================= DEPARTMENT =================
+    // Get Issues by Department ID
+    @GetMapping("/department/{departmentId}")
+    public ResponseEntity<List<IssueResponse>> getIssuesByDepartment(
+            @PathVariable Long departmentId
+    ) {
+        return ResponseEntity.ok(
+                issueService.getIssuesByDepartment(departmentId)
+        );
+    }
+
+    // ================= STATUS UPDATE =================
+    // Update Issue Status (OPEN / IN_PROGRESS / RESOLVED)
+    @PutMapping("/{issueId}/status")
+    public ResponseEntity<IssueResponse> updateIssueStatus(
+            @PathVariable Long issueId,
+            @RequestParam IssueStatus status
+    ) {
+        return ResponseEntity.ok(
+                issueService.updateIssueStatus(issueId, status)
+        );
+    }
+}
